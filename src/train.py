@@ -28,6 +28,7 @@ class Data(util.NamedEnum):
     sigmorphon17task1 = "sigmorphon17task1"
     sigmorphon19task1 = "sigmorphon19task1"
     sigmorphon19task2 = "sigmorphon19task2"
+    sigmorphon23task0 = "sigmorphon23task0"
     lemma = "lemma"
     lemmanotag = "lemmanotag"
     lematus = "lematus"
@@ -100,7 +101,12 @@ class Trainer(BaseTrainer):
             else:
                 raise ValueError
         else:
-            if dataset == Data.sigmorphon17task1:
+            if dataset == Data.sigmorphon23task0:
+                if params.indtag:
+                    self.data = dataloader.TagSIGMORPHON2023Task0(train, dev, test, params.shuffle)
+                else:
+                    self.data = dataloader.SIGMORPHON2023Task0(train, dev, test, params.shuffle)
+            elif dataset == Data.sigmorphon17task1:
                 if params.indtag:
                     self.data = dataloader.TagSIGMORPHON2017Task1(train, dev, test, params.shuffle)
                 else:

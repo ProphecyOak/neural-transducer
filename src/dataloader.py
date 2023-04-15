@@ -307,6 +307,53 @@ class SIGMORPHON2017Task1(Seq2SeqDataLoader):
             yield src, trg
 
 
+class SIGMORPHON2023Task0(Seq2SeqDataLoader):
+    def build_vocab(self):
+        char_set, tag_set = set(), set()
+        self.nb_train = 0
+        for lemma, tags, word in self.read_file(self.train_file):
+            self.nb_train += 1
+            char_set.update(lemma)
+            char_set.update(word)
+            tag_set.update(tags)
+        self.nb_dev = sum([1 for _ in self.read_file(self.dev_file)])
+        if self.test_file is not None:
+            self.nb_test = sum([1 for _ in self.read_file(self.test_file)])
+        chars = sorted(list(char_set))
+        tags = sorted(list(tag_set))
+        self.nb_attr = len(tags)
+        source = [PAD, BOS, EOS, UNK] + chars + tags
+        target = [PAD, BOS, EOS, UNK] + chars
+        return source, target
+
+    def read_file(self, file):
+        with open(file, "r", encoding="utf-8") as fp:
+            for line in fp.readlines():
+                line = line.strip()
+                if not line:
+                    continue
+                toks = line.split("\t")
+                if len(toks) != 3 and 'covered' not in file:
+                    print("WARNING: missing tokens", toks)
+                    continue
+                lemma, tags, word = toks
+                yield list(lemma), list(word), tags.split(";")
+
+    def _iter_helper(self, file):
+        for lemma, tags, word in self.read_file(file):
+            src = [self.source_c2i[BOS]]
+            for tag in tags:
+                src.append(self.attr_c2i.get(tag, UNK_IDX))
+            for char in lemma:
+                src.append(self.source_c2i.get(char, UNK_IDX))
+            src.append(self.source_c2i[EOS])
+            trg = [self.target_c2i[BOS]]
+            for char in word:
+                trg.append(self.target_c2i.get(char, UNK_IDX))
+            trg.append(self.target_c2i[EOS])
+            yield src, trg
+
+
 class Unimorph(SIGMORPHON2017Task1):
     def build_vocab(self):
         char_set, tag_set = set(), set()
@@ -420,6 +467,74 @@ class TagSIGMORPHON2017Task1(SIGMORPHON2017Task1):
     def _iter_helper(self, file):
         tag_shift = len(self.source) - self.nb_attr
         for lemma, word, tags in self.read_file(file):
+            src = []
+            src.append(self.source_c2i[BOS])
+            for char in lemma:
+                src.append(self.source_c2i.get(char, UNK_IDX))
+            src.append(self.source_c2i[EOS])
+            trg = []
+            trg.append(self.target_c2i[BOS])
+            for char in word:
+                trg.append(self.target_c2i.get(char, UNK_IDX))
+            trg.append(self.target_c2i[EOS])
+            attr = [0] * (self.nb_attr + 1)
+            for tag in tags:
+                if tag in self.attr_c2i:
+                    attr_idx = self.attr_c2i[tag] - tag_shift
+                else:
+                    attr_idx = -1
+                if attr[attr_idx] == 0:
+                    attr[attr_idx] = self.attr_c2i.get(tag, UNK_IDX)
+            yield src, trg, attr
+
+    def _batch_sample(self, batch_size, file, shuffle):
+        key = self._file_identifier(file)
+        if key not in self.batch_data:
+            lst = list()
+            for src, trg, attr in tqdm(self._iter_helper(file), desc="read file"):
+                lst.append((src, trg, attr))
+            src_data, src_mask = self.list_to_tensor([src for src, _, _ in lst])
+            trg_data, trg_mask = self.list_to_tensor([trg for _, trg, _ in lst])
+            attr_data, _ = self.list_to_tensor([attr for _, _, attr in lst])
+            attr_data = attr_data.transpose(0, 1)
+            data = ((src_data, attr_data), src_mask, trg_data, trg_mask)
+            self.batch_data[key] = data
+
+        data = self.batch_data[key]
+        (src_data, attr_data), src_mask, trg_data, trg_mask = data
+        nb_example = len(src_data[0])
+        if shuffle:
+            idx = np.random.permutation(nb_example)
+        else:
+            idx = np.arange(nb_example)
+        for start in range(0, nb_example, batch_size):
+            idx_ = idx[start : start + batch_size]
+            src_mask_b = src_mask[:, idx_]
+            trg_mask_b = trg_mask[:, idx_]
+            src_len = int(src_mask_b.sum(dim=0).max().item())
+            trg_len = int(trg_mask_b.sum(dim=0).max().item())
+            src_data_b = src_data[:src_len, idx_].to(self.device)
+            trg_data_b = trg_data[:trg_len, idx_].to(self.device)
+            src_mask_b = src_mask_b[:src_len].to(self.device)
+            trg_mask_b = trg_mask_b[:trg_len].to(self.device)
+            attr_data_b = attr_data[idx_, :].to(self.device)
+            yield ((src_data_b, attr_data_b), src_mask_b, trg_data_b, trg_mask_b)
+
+    def _sample(self, file):
+        for src, trg, tags in self._iter_helper(file):
+            yield (
+                (
+                    torch.tensor(src, device=self.device).view(len(src), 1),
+                    torch.tensor(tags, device=self.device).view(1, len(tags)),
+                ),
+                torch.tensor(trg, device=self.device).view(len(trg), 1),
+            )
+
+
+class TagSIGMORPHON2023Task0(SIGMORPHON2023Task0):
+    def _iter_helper(self, file):
+        tag_shift = len(self.source) - self.nb_attr
+        for lemma, tags, word in self.read_file(file):
             src = []
             src.append(self.source_c2i[BOS])
             for char in lemma:
