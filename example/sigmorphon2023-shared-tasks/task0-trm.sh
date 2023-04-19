@@ -9,7 +9,7 @@ warmup=4000
 beta2=0.98       # 0.999
 label_smooth=0.1 # 0.0
 total_eval=50
-bs=256 # 400
+bs=400 # 256
 
 # transformer
 layers=4
@@ -25,7 +25,7 @@ tst_path=../../../2023InflectionST/part1/data
 
 for lang in deu heb eng san afb kat amh fra mkd hye sme dan heb_unvoc fin jap hun tur bel klr nav grc arz rus swa ita spa sqi
     python src/train.py \
-        --dataset sigmorphon17task1 \
+        --dataset sigmorphon23task0 \
         --train $trn_path/$lang.trn \
         --dev $trn_path/$lang.dev \
         --test $tst_path/$lang.tst \
