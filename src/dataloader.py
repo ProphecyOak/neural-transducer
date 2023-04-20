@@ -308,6 +308,16 @@ class SIGMORPHON2017Task1(Seq2SeqDataLoader):
 
 
 class SIGMORPHON2023Task0(Seq2SeqDataLoader):
+    def __init__(
+        self,
+        train_file: List[str],
+        dev_file: List[str],
+        test_file: Optional[List[str]] = None,
+        shuffle=False,
+    ):
+        self.case_pat = re.compile(';[A-Z]+?\+?[A-Z]*?\(.+?\)')
+        super().__init__(train_file, dev_file, test_file=test_file, shuffle=shuffle)
+
     def build_vocab(self):
         char_set, tag_set = set(), set()
         self.nb_train = 0
@@ -337,7 +347,20 @@ class SIGMORPHON2023Task0(Seq2SeqDataLoader):
                     print("WARNING: missing tokens", toks)
                     continue
                 lemma, tags, word = toks
-                yield list(lemma), list(word), tags.split(";")
+                yield list(lemma), list(word), self.split_tags(tags)
+
+    def split_tags(self, tags):
+        if tags.startswith(('N', 'ADJ')):
+            tags = tags.replace('(', ';').replace(')', ';')
+            tags = tags.strip(';')
+        else:
+            for match in self.case_pat.finditer(tags):
+                text = match.group()
+                case = text[1:text.index('(')]
+                orig = text[text.index('(') + 1:-1].replace(';',',').split(',')
+                distributed = ';' + ';'.join([case + '-' + feat for feat in orig])
+                tags = tags.replace(text, distributed)
+        return tags.split(';')
 
     def _iter_helper(self, file):
         for lemma, word, tags in self.read_file(file):
