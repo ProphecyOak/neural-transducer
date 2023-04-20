@@ -311,7 +311,7 @@ class SIGMORPHON2023Task0(Seq2SeqDataLoader):
     def build_vocab(self):
         char_set, tag_set = set(), set()
         self.nb_train = 0
-        for lemma, tags, word in self.read_file(self.train_file):
+        for lemma, word, tags in self.read_file(self.train_file):
             self.nb_train += 1
             char_set.update(lemma)
             char_set.update(word)
@@ -340,7 +340,7 @@ class SIGMORPHON2023Task0(Seq2SeqDataLoader):
                 yield list(lemma), list(word), tags.split(";")
 
     def _iter_helper(self, file):
-        for lemma, tags, word in self.read_file(file):
+        for lemma, word, tags in self.read_file(file):
             src = [self.source_c2i[BOS]]
             for tag in tags:
                 src.append(self.attr_c2i.get(tag, UNK_IDX))
@@ -534,7 +534,7 @@ class TagSIGMORPHON2017Task1(SIGMORPHON2017Task1):
 class TagSIGMORPHON2023Task0(SIGMORPHON2023Task0):
     def _iter_helper(self, file):
         tag_shift = len(self.source) - self.nb_attr
-        for lemma, tags, word in self.read_file(file):
+        for lemma, word, tags in self.read_file(file):
             src = []
             src.append(self.source_c2i[BOS])
             for char in lemma:
