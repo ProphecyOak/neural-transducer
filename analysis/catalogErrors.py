@@ -1,7 +1,7 @@
 import sys
 import re
 
-def sortOutErrors(fileToCheck="test", sortFunction=lambda x: x, language="fra"):
+def sortOutErrors(fileToCheck="test", sortFunction=lambda x: x[0], language="fra"):
     with open(f"../checkpoints/sig23/tagtransformer/{language}.decode.{fileToCheck}.tsv") as f:
         contents = f.read()
 
@@ -19,15 +19,19 @@ def sortOutErrors(fileToCheck="test", sortFunction=lambda x: x, language="fra"):
         for form in dat.read().strip().split("\n"):
             splitForm = re.split(r"\s+",form)
             lemmaDict[splitForm[2]] = splitForm[0]
+        reducedErrorColumns = []
         for line in errorColumns:
             try:
                 line.insert(0,lemmaDict[line[1]])
+                reducedErrorColumns.append(line)
             except:
                 u.write("\t".join(line)+"\n")
-                errorColumns.remove(line)
-        errorColumns.sort(key=sortFunction)
-        for line in errorColumns:
+        reducedErrorColumns.sort(key=sortFunction)
+        for line in reducedErrorColumns:
             if len(line) == 5: e.write("\t".join(line)+"\n")
 
+sortByDistance = lambda x: -1*int(x[4])
+sortByLemma = lambda x: x[0]
+
 if __name__ == "__main__":
-    sortOutErrors("test")
+    sortOutErrors("test", sortByLemma)
