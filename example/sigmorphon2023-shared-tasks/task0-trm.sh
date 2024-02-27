@@ -20,10 +20,10 @@ nb_heads=4
 dropout=0.3
 ckpt_dir=checkpoints/sig23
 
-trn_path=../../../2023InflectionST/part1/data
-tst_path=../../../2023InflectionST/part1/data
+trn_path=../2023InflectionST/part1/data
+tst_path=../2023InflectionST/part1/data
 
-for lang in deu heb eng san afb kat amh fra mkd hye sme dan heb_unvoc fin jap hun tur bel klr nav grc arz rus swa ita spa sqi
+for lang in fra; do
     python src/train.py \
         --dataset sigmorphon23task0 \
         --train $trn_path/$lang.trn \
